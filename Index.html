@@ -1,0 +1,181 @@
+<!DOCTYPE html>
+<html lang="pt-br">
+<head>
+<meta charset="UTF-8">
+<title>Sistema Jurídico Firebase</title>
+
+<script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-auth-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-firestore-compat.js"></script>
+
+<style>
+body { font-family: Arial; background:#f2f2f2; padding:20px; }
+.box { background:#fff; padding:20px; max-width:420px; margin:auto; border-radius:8px; }
+input, textarea, button { width:100%; margin-top:10px; padding:10px; }
+button { background:#222; color:#fff; border:none; cursor:pointer; }
+.hidden { display:none; }
+hr { margin:20px 0; }
+</style>
+</head>
+
+<body>
+
+<div class="box">
+
+<h2 id="title">Login</h2>
+
+<!-- LOGIN -->
+<div id="login">
+  <input id="loginEmail" placeholder="Email">
+  <input id="loginPassword" type="password" placeholder="Senha">
+  <input id="adminPassword" type="password" placeholder="Senha admin (opcional)">
+  <button onclick="login()">Entrar</button>
+  <p><a href="#" onclick="showRegister()">Criar conta</a></p>
+</div>
+
+<!-- CADASTRO -->
+<div id="register" class="hidden">
+  <input id="name" placeholder="Nome">
+  <input id="age" placeholder="Idade">
+  <input id="registerEmail" placeholder="Email">
+  <input id="registerPassword" type="password" placeholder="Senha">
+  <button onclick="register()">Cadastrar</button>
+  <p><a href="#" onclick="showLogin()">Voltar</a></p>
+</div>
+
+<!-- USUÁRIO -->
+<div id="userPanel" class="hidden">
+  <h3>Solicitar Advogado (RPA)</h3>
+  <textarea id="pedido" placeholder="Descreva o caso"></textarea>
+  <button onclick="enviarPedido()">Enviar pedido</button>
+  <button onclick="logout()">Sair</button>
+</div>
+
+<!-- ADMIN -->
+<div id="adminPanel" class="hidden">
+  <h3>🔐 Painel Admin</h3>
+
+  <h4>Usuários</h4>
+  <ul id="userList"></ul>
+
+  <h4>Pedidos de Advogado</h4>
+  <ul id="pedidoList"></ul>
+
+  <button onclick="logout()">Sair</button>
+</div>
+
+</div>
+
+<script>
+/* 🔥 CONFIG FIREBASE */
+const firebaseConfig = {
+  apiKey: "SUA_API_KEY",
+  authDomain: "SEU_PROJETO.firebaseapp.com",
+  projectId: "SEU_PROJETO",
+};
+firebase.initializeApp(firebaseConfig);
+
+const auth = firebase.auth();
+const db = firebase.firestore();
+
+/* 🔑 SENHA ADMIN */
+const ADMIN_PASSWORD = "2310";
+
+/* TELAS */
+function showRegister() {
+  login.classList.add("hidden");
+  register.classList.remove("hidden");
+}
+function showLogin() {
+  register.classList.add("hidden");
+  login.classList.remove("hidden");
+}
+
+/* CADASTRO */
+function register() {
+  auth.createUserWithEmailAndPassword(registerEmail.value, registerPassword.value)
+  .then(res => {
+    return db.collection("users").doc(res.user.uid).set({
+      name: name.value,
+      age: age.value,
+      email: registerEmail.value
+    });
+  })
+  .then(() => {
+    alert("Cadastrado!");
+    showLogin();
+  })
+  .catch(e => alert(e.message));
+}
+
+/* LOGIN */
+let isAdmin = false;
+
+function login() {
+  if (adminPassword.value === ADMIN_PASSWORD) {
+    isAdmin = true;
+  }
+
+  auth.signInWithEmailAndPassword(loginEmail.value, loginPassword.value)
+  .catch(e => alert(e.message));
+}
+
+/* LOGOUT */
+function logout() {
+  isAdmin = false;
+  auth.signOut();
+}
+
+/* AUTH STATE */
+auth.onAuthStateChanged(user => {
+  if (!user) {
+    userPanel.classList.add("hidden");
+    adminPanel.classList.add("hidden");
+    showLogin();
+    return;
+  }
+
+  login.classList.add("hidden");
+  register.classList.add("hidden");
+
+  if (isAdmin) {
+    adminPanel.classList.remove("hidden");
+    loadAdminData();
+  } else {
+    userPanel.classList.remove("hidden");
+  }
+});
+
+/* USUÁRIO → PEDIDO */
+function enviarPedido() {
+  db.collection("pedidos").add({
+    texto: pedido.value,
+    user: auth.currentUser.email,
+    data: new Date()
+  }).then(() => {
+    alert("Pedido enviado!");
+    pedido.value = "";
+  });
+}
+
+/* ADMIN */
+function loadAdminData() {
+  userList.innerHTML = "";
+  pedidoList.innerHTML = "";
+
+  db.collection("users").get().then(snap => {
+    snap.forEach(doc => {
+      userList.innerHTML += `<li>${doc.data().name} (${doc.data().email})</li>`;
+    });
+  });
+
+  db.collection("pedidos").get().then(snap => {
+    snap.forEach(doc => {
+      pedidoList.innerHTML += `<li>${doc.data().user}: ${doc.data().texto}</li>`;
+    });
+  });
+}
+</script>
+
+</body>
+</html>
